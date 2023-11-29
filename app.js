@@ -36,7 +36,7 @@ initializeDbAndServer();
 app.post("/register/", async (request, response) => {
   const { username, password, name, gender } = request.body;
   const hashedPassword = await bcrypt.hash(password, 10);
-  const selectUserQuery = `SELECT * FROM user WHERE username = ${username};`;
+  const selectUserQuery = `SELECT * FROM user WHERE username = '${username}';`;
   const dbUser = await db.get(selectUserQuery);
 
   if (dbUser === undefined) {
@@ -47,7 +47,7 @@ app.post("/register/", async (request, response) => {
       const createUserQuery = `
             INSERT INTO 
             user (username, password, name, gender)
-            VALUES ('${username}', '${hashedPassword}', '${name}', '${gender}')`;
+            VALUES ('${username}', '${hashedPassword}', '${name}', '${gender}');`;
       await db.run(createUserQuery);
       response.status(200);
       response.send("User created successfully");
@@ -62,7 +62,7 @@ app.post("/register/", async (request, response) => {
 
 app.post("/login/", async (request, response) => {
   const { username, password } = request.body;
-  const selectUserQuery = `SELECT * FROM user WHERE username = ${username};`;
+  const selectUserQuery = `SELECT * FROM user WHERE username = '${username}';`;
   const dbUser = await db.get(selectUserQuery);
 
   if (dbUser !== undefined) {
@@ -111,9 +111,10 @@ const authenticateToken = (request, response, next) => {
 
 const getTheFollowingPeopleQuery = async (username) => {
   const followingPeopleQuery = `
-        SELECT following_user_id FROM follower
+        SELECT 
+        following_user_id FROM follower
         INNER JOIN user ON user.user_id = follower.follower_user_id
-        WHERE user.username = ${username};`;
+        WHERE user.username = '${username}';`;
 
   const followingPeople = await db.all(followingPeopleQuery);
   const arrayOfIds = followingPeople.map(
@@ -131,7 +132,7 @@ app.get("/user/tweets/feed/", authenticateToken, async (request, response) => {
     SELECT username, tweet, date_time AS dateTime
     FROM user INNER JOIN tweet ON user.user_id = tweet.user_id
     WHERE 
-    user.user_id IN (${followingPeopleIds})
+    user.user_id IN ('${followingPeopleIds}')
     ORDER BY date_time DESC
     LIMIT 4;`;
 
@@ -157,7 +158,7 @@ app.get("/user/following/", authenticateToken, async (request, response) => {
 app.get("/user/followers/", authenticateToken, async (request, response) => {
   const { username, userId } = request;
   const getFollowerQuery = `
-    SELECT  DISTINCT name FROM follower 
+    SELECT DISTINCT name FROM follower 
     INNER JOIN user ON user.user_id = follower.follower_user_id
     WHERE following_user_id = '${userId}';`;
 
@@ -174,7 +175,7 @@ const tweetAccessVerification = async (request, response, next) => {
         SELECT * FROM 
         tweet INNER JOIN follower
         ON tweet.user_id = follower.following_user_id
-        WHERE tweet.tweet_id = ${tweetId} AND follower_user_id = ${userId};`;
+        WHERE tweet.tweet_id = '${tweetId}' AND follower_user_id = '${userId}';`;
   const tweet = await db.get(getTweetQuery);
 
   if (tweet === undefined) {
@@ -282,18 +283,17 @@ app.delete(
   async (request, response) => {
     const { tweetId } = request.params;
     const { userId } = request.body;
-    const getTheTweetQuery = `
-    SELECT * FROM tweet WHERE user_id = ${userId} AND tweet_id = ${tweet_id}'`;
-    console.log(tweet);
+    const getTheTweetQuery = `SELECT * FROM tweet WHERE user_id = '${userId}' AND tweet_id = '${tweetId}';`;
+    // console.log(tweet);
+    const tweet = await db.get(getTheTweetQuery);
     if (tweet === undefined) {
       response.status(401);
       response.send("Invalid Request");
     } else {
-      const deleteTweetQuery = `DELETE FROM tweet WHERE tweet_id = '${tweet_id}';`;
+      const deleteTweetQuery = `DELETE FROM tweet WHERE tweet_id = '${tweetId}';`;
       await db.run(deleteTweetQuery);
       response.send("Tweet Removed");
     }
   }
 );
-
 module.exports = app;
