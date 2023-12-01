@@ -101,6 +101,7 @@ const authenticateToken = (request, response, next) => {
         response.status(401);
         response.send("Invalid JWT Token");
       } else {
+        request.username = payload.username;
         next();
       }
     });
@@ -129,11 +130,14 @@ app.get("/user/tweets/feed/", authenticateToken, async (request, response) => {
   const followingPeopleIds = await getTheFollowingPeopleQuery(username);
 
   const getTweetsQuery = `
-    SELECT username, tweet, date_time AS dateTime
-    FROM user INNER JOIN tweet ON user.user_id = tweet.user_id
-    WHERE 
-    user.user_id IN ('${followingPeopleIds}')
-    ORDER BY date_time DESC
+    SELECT username.username, tweet.tweet, tweet.date_time AS dateTime
+    FROM follower INNER JOIN tweet ON follower.following_user_id = tweet.user_id
+    INNER JOIN user
+    ON tweet.user_id = user.user_id
+    WHERE
+    follower.follower_user_id = '${userId}'
+    ORDER BY
+    tweet.date_time DESC
     LIMIT 4;`;
 
   const tweets = await db.all(getTweetsQuery);
@@ -253,9 +257,9 @@ app.get("/user/tweets/", authenticateToken, async (request, response) => {
         date_time AS dateTime
         FROM tweet LEFT JOIN ON
         tweet.tweet_id = reply.tweet_id
-        LEFT JOIN  like ON
+        LEFT JOIN like ON
         tweet.tweet_id = like.tweet_id
-        WHERE tweet.user_id = ${userId}
+        WHERE tweet.user_id = '${userId}'
         GROUP BY tweet.tweet_id;`;
   const tweets = await db.all(getTweetQuery);
   response.send(tweets);
